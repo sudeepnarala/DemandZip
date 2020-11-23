@@ -4,6 +4,10 @@
 #include <vector>
 #include <utility>
 #include <queue>
+#include <math.h>
+#include <string>
+#include <iostream>
+#include <fstream>
 using namespace std;
 
 struct node {
@@ -13,24 +17,7 @@ struct node {
     struct node* right;
 };
 
-vector<pair<char, string> > v;
-
-
-// template<class T>
-// bool bigger(T t1, T t2)
-// {
-//     return t1.value > t2.value;
-// }
-
-// bool operator>(const struct node n1, const struct node n2) 
-// {
-//     return n1.num > n2.num;
-// }
-
-// bool cmp(pair<char, int> p1, pair<char, int> p2)
-// {
-//     return p1.second > p2.second;
-// }
+vector<pair<char, string> > codes;
 
 struct cmp {
     bool operator() (struct node* n1, struct node* n2)
@@ -47,10 +34,94 @@ void get_codes(struct node* curr, string code)
     }
     if(curr->left == NULL && curr->right == NULL)
     {
-        v.push_back(make_pair(curr->value, code));
+        codes.push_back(make_pair(curr->value, code));
     }
     get_codes(curr->left, code + "0");
     get_codes(curr->right, code + "1");
+}
+
+void create_demand_unzip(char graph[], int size, string fname)
+{
+    // Store the binary tree --> Store -1 if not leaf char
+    for(int i=0; i<size; i++)
+    {
+        graph[i] = -1;
+    }
+
+    for(auto c=codes.begin(); c != codes.end(); c++)
+    {
+        int loc = 1;
+        for(int i=0; i != c->second.length(); i++)
+        {
+            int add = c->second[i] == '0' ? 0 : 1;
+            loc = (2*loc) + add;
+        }
+        graph[loc-1] = c->first;
+        graph[(2*loc)-1] = 0;
+        graph[(2*loc+1)-1] = 0;
+    }
+    bitset<8> t(graph[295*2-1]);
+    ofstream Test("trial.dzip", ios::binary);
+    int actual_graph_size = size;
+    for(int i=size-1; i>=0; i--)
+    {
+        if(graph[i] != -1)  // and graph[i] != 0 because don't need leaf nodes
+        {
+            break;
+        }
+        actual_graph_size = i;  // After because, example, imagine full graph --> want to include all --> actual_graph_size = size.
+    }
+
+    // BEGINNING OF HEADER
+
+    char magic = 0x53;
+    // Magic byte header
+    Test << magic;
+
+    // Use size in order to shrink the graph / not just put a bunch of 0xFF's into the compressed file
+    // Store binary size of graphs
+    // Next actual_graph_size bytes contains the graph for decoding the dzip file 
+    Test << actual_graph_size;
+
+    Test.write(graph, actual_graph_size);
+    // Store the bit breaking within the file in order to partially decompress
+
+    // ENDING OF HEADER
+    map<char, string> codes_map;
+    for(auto a=codes.begin(); a != codes.end(); a++)
+    {
+        codes_map[a->first] = a->second;
+    }
+
+    ifstream uncompressed;
+    char* buffer;
+    uncompressed.open(fname, ios::binary);
+    uncompressed.seekg(0, uncompressed.end);    // Seek to end of file
+    int length = uncompressed.tellg();          // Tell to find current position (which is end of file)
+    buffer = new char[length];
+    uncompressed.seekg(0, uncompressed.beg);
+    uncompressed.read(buffer, length);              // Read contents of file into buffer
+    int x = 0;
+    char curr = 0;
+    int total = 0;
+    for(int i=0; i < length; i++)   // Go through uncompressed file
+    {
+        string s = codes_map[buffer[i]];    // s is the code
+        for(int j=0; j != s.length(); j++)
+        {
+            char b = s[j] == '0' ? 0 : 1;
+            curr = curr | (b << (7-x));
+            x += 1;
+            if(x == 8)
+            {
+                Test << curr;
+                curr = 0;
+                x = 0;
+                total += 1;
+            }
+        }
+    }
+    Test.close();
 }
 
 
@@ -80,33 +151,6 @@ void do_huffman(string fname)
             freq[buffer[i]] += 1;
         }
     }
-    // 1. Sort elements by frequency
-
-    // vector<pair<char, int> > t;
-
-    // for(auto it = freq.begin(); it != freq.end(); it++)
-    // {
-    //     t.push_back(make_pair(it->first, it->second));
-    // }
-
-    // for(auto it = t.begin(); it != t.end(); it++)
-    // {
-    //     cout << hex << (int) it->first << " - " << it->second << endl;
-    // }
-
-    // cout << "______________" << endl;
-
-    // sort(t.begin(), t.end(), cmp);
-
-    // for(auto it = t.begin(); it != t.end(); it++)
-    // {
-    //     cout << hex << (int) it->first << " - " << it->second << endl;
-    // }
-
-    // 2. Create huffman tree --> Branch with 0 and 1 becomes the subtree
-    /*
-
-    */
 
     priority_queue<struct node*,vector<struct node*>,cmp > q;
     
@@ -141,17 +185,24 @@ void do_huffman(string fname)
 
     get_codes(root, "");
 
-    for(auto a = v.begin(); a != v.end(); a++)
+    int m = 0;
+
+    for(auto a = codes.begin(); a != codes.end(); a++)
     {
-        cout << a->first << " - " << a->second << endl;
+        // cout << a->first << " - " << a->second << endl;
+        if((a->second).length() > m)
+        {
+            m = (a->second).length();
+        }
     }
-
-
-
+    m += 1;
+    int arr_size = (int) (pow(2, m)-1);
+    char graph[arr_size];
+    create_demand_unzip(graph, arr_size, fname);
 }
 
 int main()
 {
-    do_huffman("trial.txt");
+    do_huffman("stuff2.csv");
     return 0;
 }
