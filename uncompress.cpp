@@ -25,17 +25,22 @@ int expand(string fname)
     char graph[graph_size];
     compressed.read(graph, graph_size);
     // Traverse graph and create new file with file data
-    ofstream output_file("trial.csv", ios::binary);
+    ofstream output_file("test.csv", ios::binary);
     char buf;
     int x = 0;
     int location = 1;
     int count = 0;
+    int curr = compressed.tellg();          // Tell to find current position (which is end of file)
+    compressed.seekg(0, compressed.end);    // Seek to end of file
+    int length = compressed.tellg();
+    length -= curr;
+    compressed.seekg(curr);
+    char* buffer = new char[length]; 
+    compressed.read(buffer, length);
 
-    
-    while(!compressed.eof())
+    for(int i=0; i<length; i++)
     {
-        count += 1;
-        compressed >> buf;
+        buf = buffer[i];
         while(x <= 7)
         {
             if(((location*2-1) >= graph_size) || ((graph[location*2-1] == 0) && (graph[location*2+1-1] == 0)))
@@ -55,15 +60,20 @@ int expand(string fname)
         }
         x = 0;
     }
-    cout << count << endl;
     return 0;
 }
 
-int main()
+int main(int argc, char** argv)
 {
-    int ret = expand("trial.dzip");
+    if(argc < 2)
+    {
+        cout << "Need to supply at least 1 argument" << endl;
+        exit(1);
+    }
+    int ret = expand(argv[1]);
     if(ret == -1)
     {
         cout << "Magic signature doesn't match" << endl;
+        exit(1);
     }
 }

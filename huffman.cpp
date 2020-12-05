@@ -61,7 +61,13 @@ void create_demand_unzip(char graph[], int size, string fname)
         graph[(2*loc+1)-1] = 0;
     }
     bitset<8> t(graph[295*2-1]);
-    ofstream Test("trial.dzip", ios::binary);
+    string base_fname = "";
+    for(int i=0; i<fname.length() && fname[i] != '.'; i++)
+    {
+        base_fname += fname[i];
+    }
+    string dzip_fname = base_fname + ".dzip";
+    ofstream compressed(dzip_fname, ios::binary);
     int actual_graph_size = size;
     for(int i=size-1; i>=0; i--)
     {
@@ -76,14 +82,14 @@ void create_demand_unzip(char graph[], int size, string fname)
 
     char magic = 0x53;
     // Magic byte header
-    Test << magic;
+    compressed << magic;
 
     // Use size in order to shrink the graph / not just put a bunch of 0xFF's into the compressed file
     // Store binary size of graphs
     // Next actual_graph_size bytes contains the graph for decoding the dzip file 
-    Test << actual_graph_size;
+    compressed << actual_graph_size;
 
-    Test.write(graph, actual_graph_size);
+    compressed.write(graph, actual_graph_size);
     // Store the bit breaking within the file in order to partially decompress
 
     // ENDING OF HEADER
@@ -114,14 +120,15 @@ void create_demand_unzip(char graph[], int size, string fname)
             x += 1;
             if(x == 8)
             {
-                Test << curr;
+                bitset<8> b(curr);
+                compressed << curr;
                 curr = 0;
                 x = 0;
                 total += 1;
             }
         }
     }
-    Test.close();
+    compressed.close();
 }
 
 
@@ -201,8 +208,13 @@ void do_huffman(string fname)
     create_demand_unzip(graph, arr_size, fname);
 }
 
-int main()
+int main(int argc, char** argv)
 {
-    do_huffman("stuff2.csv");
+    if(argc < 2)
+    {
+        cout << "Need to supply at least 1 argument" << endl;
+        exit(1);
+    }
+    do_huffman(argv[1]);
     return 0;
 }
