@@ -20,6 +20,30 @@ int expand(string fname)
     {
         return -1;
     }
+
+    int num_partitions;
+    char temp2[4];
+    compressed.read(temp2, 4);
+    num_partitions += temp2[0];
+    num_partitions += (temp2[1]<<8);
+    num_partitions += (temp2[2]<<16);
+    num_partitions += (temp2[3]<<24);
+    printf("There are %d partitions\n", num_partitions);
+    int partitions[num_partitions];
+    int temp;
+    for(int i=0; i<num_partitions; i++)
+    {
+        char temp[4];
+        int a = 0;
+        compressed.read(temp, 4);
+        a = 0;
+        a |= (temp[0] & 0x000000FF);
+        a |= ((temp[1] << 8) & 0x0000FF00);
+        a |= ((temp[2] << 16) & 0x00FF0000);
+        a |= ((temp[3] << 24) & 0xFF000000);
+        partitions[i] = a;
+    }
+
     int graph_size;
     compressed >> graph_size;
     char graph[graph_size];

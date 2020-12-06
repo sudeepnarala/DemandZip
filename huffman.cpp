@@ -10,6 +10,8 @@
 #include <fstream>
 using namespace std;
 
+#define NUM_PARTITIONS 20
+
 struct node {
     int num;
     char value;
@@ -83,6 +85,19 @@ void create_demand_unzip(char graph[], int size, string fname)
     char magic = 0x53;
     // Magic byte header
     compressed << magic;
+    // Store the bit breaking within the file in order to partially decompress
+    char temp2[4];
+    temp2[0] = NUM_PARTITIONS & 0xff;
+    temp2[1] = (NUM_PARTITIONS>>8)  & 0xff;
+    temp2[2] = (NUM_PARTITIONS>>16) & 0xff;
+    temp2[3] = (NUM_PARTITIONS>>24) & 0xff;
+    compressed << temp2[0];
+    compressed << temp2[1];
+    compressed << temp2[2];
+    compressed << temp2[3];
+    char partitions_temp[NUM_PARTITIONS*4];
+    compressed.write(partitions_temp, NUM_PARTITIONS*4);
+
 
     // Use size in order to shrink the graph / not just put a bunch of 0xFF's into the compressed file
     // Store binary size of graphs
@@ -90,7 +105,6 @@ void create_demand_unzip(char graph[], int size, string fname)
     compressed << actual_graph_size;
 
     compressed.write(graph, actual_graph_size);
-    // Store the bit breaking within the file in order to partially decompress
 
     // ENDING OF HEADER
     map<char, string> codes_map;
@@ -110,9 +124,16 @@ void create_demand_unzip(char graph[], int size, string fname)
     int x = 0;
     char curr = 0;
     int total = 0;
+    int partitions[NUM_PARTITIONS];     // Stores the bit number at which this partition ends in the compressed file
+    bool store = false;
+    int idx = 0;
     for(int i=0; i < length; i++)   // Go through uncompressed file
     {
         string s = codes_map[buffer[i]];    // s is the code
+        if((i%(length/NUM_PARTITIONS+1) == 0) && (i != 0))
+        {
+            store = true;
+        }
         for(int j=0; j != s.length(); j++)
         {
             char b = s[j] == '0' ? 0 : 1;
@@ -127,6 +148,25 @@ void create_demand_unzip(char graph[], int size, string fname)
                 total += 1;
             }
         }
+        if(store)
+        {
+            partitions[idx] = total*8 + x;
+            idx += 1;
+        }
+        store = false;
+    }
+    compressed.seekp(sizeof(char)+sizeof(int));
+
+    for(int i=0; i < NUM_PARTITIONS; i++)
+    {
+        char temp[4];
+        temp[0] = partitions[i] & 0xff;
+        temp[1] = (partitions[i]>>8)  & 0xff;
+        temp[2] = (partitions[i]>>16) & 0xff;
+        temp[3] = (partitions[i]>>24) & 0xff;
+        compressed.write(temp, 4);
+        bitset<8> b(temp[1]);
+        cout << partitions[i] << " : " << b << endl;
     }
     compressed.close();
 }
